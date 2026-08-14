@@ -3,7 +3,7 @@ from mahogany.jobs.update_landing import _fmt_price, update_stats
 
 def test_fmt_price():
     assert _fmt_price(685_000) == "$685k"
-    assert "M" in _fmt_price(1_250_000)
+    assert _fmt_price(1_250_000) == "$1.25M"
 
 
 def test_update_stats_patches_data_stat():
@@ -21,6 +21,8 @@ def test_update_stats_patches_data_stat():
         {"price": 600_000, "days_on_market": 1},
     ]
     out = update_stats(html, listings, {"calgary": 159.4})
-    assert 'data-stat="active">3<' in out or "stat-active" in out and ">3<" in out
-    assert "159¢" in out
-    assert "$500k" in out or "$600k" in out  # entry or median
+    assert 'data-stat="active">3<' in out
+    assert 'data-stat="median">$600k<' in out
+    assert 'data-stat="entry">$500k<' in out
+    assert 'data-stat="new-week">2<' in out
+    assert 'data-stat="gas">159¢<' in out

@@ -29,6 +29,14 @@ def download_image(url: str | None, timeout: int = 20) -> bytes | None:
     return None
 
 
+def _first_image(listings: list[dict[str, Any]]) -> tuple[bytes | None, dict[str, Any] | None]:
+    for listing in listings:
+        img = download_image(listing.get("image_url"))
+        if img:
+            return img, listing
+    return None, None
+
+
 def fetch_real_listing_image(
     *,
     prefer: str = "sale",
@@ -37,28 +45,53 @@ def fetch_real_listing_image(
     """
     Return (image_bytes, listing_dict) from live Kijiji scrape.
     prefer: "sale" | "rental" | "any"
+    Falls back across sale↔rental when images fail to download, not only when
+    the scrape returns zero rows.
     """
-    listings: list[dict[str, Any]] = []
+    sale: list[dict[str, Any]] = []
+    rentals: list[dict[str, Any]] = []
     try:
         if prefer in ("sale", "any"):
             from mahogany.scrapers.listings import fetch_mahogany_listings
 
-            listings.extend(fetch_mahogany_listings(max_results=max_results) or [])
-        if prefer in ("rental", "any") or (prefer == "sale" and not listings):
+            sale = fetch_mahogany_listings(max_results=max_results) or []
+        if prefer in ("rental", "any"):
             from mahogany.scrapers.rentals import fetch_mahogany_rentals
 
             rentals = fetch_mahogany_rentals(max_results=max_results) or []
-            if prefer == "rental":
-                listings = rentals
-            else:
-                listings.extend(rentals)
     except Exception as e:
         logger.warning("Real listing scrape failed: %s", e)
         return None, None
 
-    for listing in listings:
-        img = download_image(listing.get("image_url"))
+    if prefer == "sale":
+        order = (sale, rentals)
+    elif prefer == "rental":
+        order = (rentals, sale)
+    else:
+        order = (sale, rentals)
+
+    for bucket in order:
+        img, listing = _first_image(bucket)
         if img:
             return img, listing
+
+    # If prefer was sale/rental and the other side was not fetched yet
+    if prefer == "sale" and not rentals:
+        try:
+            from mahogany.scrapers.rentals import fetch_mahogany_rentals
+
+            rentals = fetch_mahogany_rentals(max_results=max_results) or []
+            return _first_image(rentals)
+        except Exception as e:
+            logger.warning("Rental fallback scrape failed: %s", e)
+    if prefer == "rental" and not sale:
+        try:
+            from mahogany.scrapers.listings import fetch_mahogany_listings
+
+            sale = fetch_mahogany_listings(max_results=max_results) or []
+            return _first_image(sale)
+        except Exception as e:
+            logger.warning("Sale fallback scrape failed: %s", e)
+
     logger.info("No real listing images available")
     return None, None
