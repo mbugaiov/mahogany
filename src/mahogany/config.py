@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
-load_dotenv("/etc/mahogany.env")
+
+_etc = Path("/etc/mahogany.env")
+if _etc.is_file() and os.access(_etc, os.R_OK):
+    load_dotenv(_etc)
 
 DATA_DIR = Path(os.getenv("MAHOGANY_DATA_DIR", str(ROOT / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
