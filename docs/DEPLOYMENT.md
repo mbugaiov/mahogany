@@ -35,7 +35,18 @@ bash scripts/check_stg_build.sh
 
 One-time root bootstrap (already applied on droplet): `scripts/bootstrap_droplet.sh`
 
-## Cutover (later — not now)
+## Cutover status
+
+**Done (2026-08-14):** systemd units → `/opt/mahogany` CLI; legacy tree moved to `/root/mahogany.pre-cutover`; Mac `com.mahogany.*` launchd unloaded.
+
+### Remaining optional
+
+- Rotate secrets (mahogany#3)
+- Port `economics` job or keep timer disabled
+- Delete `/root/mahogany.pre-cutover` after a soak period
+- Archive local `/Users/max/Downloads/project/mahogany`
+
+## Cutover (historical)
 
 1. Point job timers at `/opt/mahogany` CLI  
 2. Stop legacy `/root/mahogany` units  
