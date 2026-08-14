@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mahogany"
+version = "0.1.0"
+description = "Mahogany Life — landing, Telegram, Instagram community hub"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "feedparser>=6.0.11",
+  "requests>=2.32.3",
+  "beautifulsoup4>=4.12.3",
+  "openai>=1.74.0",
+  "python-dotenv>=1.0.1",
+  "Pillow>=10.4.0",
+  "instagrapi>=2.1.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+  "httpx>=0.27",
+]
+
+[project.scripts]
+mahogany = "mahogany.cli:main"
+mahogany-health = "mahogany.health:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+  "E501",   # line length — legacy captions
+  "B904",   # raise from — legacy
+  "UP017",  # datetime.UTC — keep timezone.utc for clarity
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Ported legacy bots — style cleanup is follow-up tickets
+"src/mahogany/jobs/**" = ["E", "F", "I", "UP", "B"]
+"src/mahogany/scrapers/**" = ["E", "F", "I", "UP", "B"]
+"src/mahogany/content/**" = ["E", "F", "I", "UP", "B"]
+"src/mahogany/telegram/**" = ["E", "F", "I", "UP", "B"]
+"src/mahogany/state/**" = ["E", "F", "I", "UP", "B"]

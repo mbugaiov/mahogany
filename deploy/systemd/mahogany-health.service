@@ -1,0 +1,16 @@
+[Unit]
+Description=Mahogany health API (build-id)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mahogany
+EnvironmentFile=-/etc/mahogany.env
+Environment=MAHOGANY_DATA_DIR=/var/lib/mahogany
+ExecStart=/opt/mahogany/.venv/bin/mahogany-health
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

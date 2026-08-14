@@ -1,0 +1,12 @@
+[Unit]
+Description=Mahogany one-shot job runner
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mahogany
+EnvironmentFile=-/etc/mahogany.env
+Environment=MAHOGANY_DATA_DIR=/var/lib/mahogany
+# Override ExecStart in drop-in or timer-specific unit:
+# ExecStart=/opt/mahogany/.venv/bin/mahogany news
+User=root

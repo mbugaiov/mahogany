@@ -1,0 +1,19 @@
+---
+description: Themis-style PR review format for mahogany
+globs:
+alwaysApply: true
+---
+
+# Code review format
+
+When reviewing PRs or changes in this repo, structure findings as:
+
+## Blocking issues
+- …
+
+## Non-blocking
+- …
+
+If nothing blocking: end with **LGTM**.
+
+Isolation: never couple to LRM / lab-rm. Secrets must not land in git.
