@@ -18,3 +18,4 @@ seen_articles.json
 dist/
 *.egg-info/
 BUILD_ID
+.themis-agent/
