@@ -5,52 +5,98 @@ from __future__ import annotations
 import logging
 import os
 import re
-import shutil
 from datetime import datetime
-from pathlib import Path
 
-from mahogany import config
 from mahogany.config import LANDING_DEST, LANDING_SRC
-from mahogany.jobs.costofliving_report import fetch_gas_prices
-from mahogany.scrapers.listings import fetch_mahogany_listings
 
 logger = logging.getLogger(__name__)
 
 
-def update_stats(html: str, listings: list, gas: dict) -> str:
-    """Replace live stats in the HTML. Skips listing stats if scraper returned nothing."""
-    gas_price = gas.get("calgary", 165.2)
-    gas_str = f"{gas_price:.0f}¢"
+def _fmt_price(n: int) -> str:
+    if n >= 1_000_000:
+        return f"${n / 1_000_000:.2f}M".replace(".00M", "M")
+    return f"${n // 1000}k"
 
-    html = re.sub(r"\d{3}¢(?:/L)?", gas_str, html)
-    html = re.sub(r"\d{3}\.\d¢/L", f"{gas_price:.1f}¢/L", html)
+
+def update_stats(html: str, listings: list, gas: dict) -> str:
+    """Patch elements with data-stat / known ids."""
+    gas_price = gas.get("calgary")
+    if gas_price is not None:
+        gas_str = f"{float(gas_price):.0f}¢"
+        html = re.sub(
+            r'(id="stat-gas"[^>]*>)([^<]*)',
+            rf"\g<1>{gas_str}",
+            html,
+            count=1,
+        )
+        html = re.sub(
+            r'data-stat="gas">[^<]*',
+            f'data-stat="gas">{gas_str}',
+            html,
+        )
 
     if not listings:
         logger.warning("Listings scraper returned 0 — keeping existing listing stats")
         return html
 
-    prices = [l["price"] for l in listings if l.get("price")]
+    prices = [int(l["price"]) for l in listings if l.get("price")]
     if not prices:
         return html
 
     active = len(prices)
     med = sorted(prices)[len(prices) // 2]
     entry = min(prices)
-    # naive "new this week" — listings with days_on_market <= 7 when present
     new_week = sum(1 for l in listings if (l.get("days_on_market") or 99) <= 7)
 
-    html = re.sub(
-        r'(id="stat-active"[^>]*>)(\d+)',
-        rf"\g<1>{active}",
-        html,
-    )
-    # fallback plain number replacements used by legacy template
-    html = re.sub(r"(Active listings</[^>]+>\s*<[^>]+>)\d+", rf"\g<1>{active}", html, count=1, flags=re.I)
+    replacements = {
+        "active": str(active),
+        "median": _fmt_price(med),
+        "entry": _fmt_price(entry),
+        "new-week": str(new_week),
+    }
+    for key, val in replacements.items():
+        html = re.sub(
+            rf'(data-stat="{re.escape(key)}">)([^<]*)',
+            rf"\g<1>{val}",
+            html,
+        )
+        id_map = {
+            "active": "stat-active",
+            "median": "stat-median",
+            "entry": "stat-entry",
+            "new-week": "mkt-new",
+        }
+        eid = id_map.get(key)
+        if eid:
+            html = re.sub(
+                rf'(id="{eid}"[^>]*>)([^<]*)',
+                rf"\g<1>{val}",
+                html,
+                count=1,
+            )
+        if key == "active":
+            html = re.sub(
+                r'(id="mkt-active"[^>]*>)([^<]*)',
+                rf"\g<1>{val}",
+                html,
+                count=1,
+            )
+        if key == "median":
+            html = re.sub(
+                r'(id="mkt-median"[^>]*>)([^<]*)',
+                rf"\g<1>{val}",
+                html,
+                count=1,
+            )
+
     return html
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    from mahogany.jobs.costofliving_report import fetch_gas_prices
+    from mahogany.scrapers.listings import fetch_mahogany_listings
+
     src = LANDING_SRC
     if not src.exists():
         raise SystemExit(f"Landing source missing: {src}")
@@ -64,10 +110,10 @@ def main() -> None:
         gas = {}
 
     html = update_stats(html, listings, gas)
-    # stamp
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     html = re.sub(
-        r"Updated [^<]+",
-        f"Updated {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        r"(Updated)[^<]*",
+        rf"\1 {stamp}",
         html,
         count=1,
     )
@@ -81,13 +127,12 @@ def main() -> None:
         src.write_text(html, encoding="utf-8")
         logger.info("Updated %s in place", src)
 
-    # Optional remote sync when DO_HOST set (no password in repo — use SSH keys)
     do_host = os.getenv("DO_HOST", "").strip()
     if do_host:
-        remote = os.getenv("DO_LANDING_PATH", "/var/www/mahogany/index.html")
-        user = os.getenv("DO_USER", "root")
         import subprocess
 
+        remote = os.getenv("DO_LANDING_PATH", "/var/www/mahogany/index.html")
+        user = os.getenv("DO_USER", "root")
         subprocess.run(
             ["scp", str(dest if dest.exists() else src), f"{user}@{do_host}:{remote}"],
             check=True,

@@ -4,17 +4,21 @@
 **Voice:** Knowledgeable neighbour. Warm. Exciting. Never corporate.  
 **Audience:** Residents, buyers/investors, Calgary-curious.
 
-## Visual direction (landing)
+## Visual direction (landing) — mahogany#9
 
 | Token | Value | Role |
 |-------|-------|------|
 | Lake | `#1a6b8a` | Primary |
-| Deep | `#0d3d52` | Hero depth |
+| Deep | `#0d3d52` | Hero depth / join band |
 | Gold | `#c9a84c` | Accent / CTA |
-| Sand | `#f5ede0` | Light sections |
-| Text | `#1c2b35` | Body |
+| Mist | `#e8f1f4` | Page ground |
+| Ink | `#1c2b35` | Body |
 
-Hero: full-bleed lake gradient atmosphere; brand-first; single CTA to Telegram.  
-Avoid purple-on-white / cream-serif terracotta defaults. Prefer lake photography / community atmosphere over abstract gradients alone.
+- **Fonts:** Fraunces (brand/display) + Manrope (UI/body). No Inter.
+- **Hero:** Full-bleed lake photo, brand-first, one headline, one lede, one Telegram CTA. No cards/stats in hero.
+- **Motion:** hero Ken-Burns + copy rise; CTA lift on hover.
+- **Charter:** [`docs/UX-CHARTER.md`](./docs/UX-CHARTER.md)
 
-Athena owns charter changes via `ux-charter-first`. Do not redesign landing on bare `impl-dev` without charter when IA/visuals change.
+## Posts
+
+Real Kijiji listing photos only for homes/market/tips. Do not DALL·E synthetic Mahogany houses.

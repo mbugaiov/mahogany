@@ -61,23 +61,33 @@ def _download_image(url: str) -> bytes | None:
 
 
 def _get_image_bytes(image_url: str | None, article_title: str = "", pillar: str = "community") -> bytes | None:
-    """
-    Get image bytes: try original URL first, fall back to DALL-E generation.
-    """
-    # 1. Try the scraped image URL
+    """Prefer real scraped / listing photos. Never invent homes with DALL·E (mahogany#9)."""
     if image_url:
         data = _download_image(image_url)
         if data:
             return data
-        logger.info("Original image failed, falling back to DALL-E…")
+        logger.info("Original image failed — trying real listing photo…")
 
-    # 2. DALL-E fallback
-    try:
-        from mahogany.content.image_gen import generate_image
-        return generate_image(article_title, pillar)
-    except Exception as e:
-        logger.warning(f"DALL-E fallback failed: {e}")
-        return None
+    # Realestate (and any home-adjacent) → real Kijiji photo only
+    if pillar in {"realestate", "development", "lake", "community"}:
+        try:
+            from mahogany.content.real_media import fetch_real_listing_image
+
+            img, _ = fetch_real_listing_image(prefer="any")
+            if img:
+                return img
+        except Exception as e:
+            logger.warning("Real listing image fallback failed: %s", e)
+
+    # Non-home news may still use DALL·E for abstract/community scenes — but not houses
+    if pillar in {"calgary", "safety"}:
+        try:
+            from mahogany.content.image_gen import generate_image
+
+            return generate_image(article_title, pillar)
+        except Exception as e:
+            logger.warning("DALL-E fallback failed: %s", e)
+    return None
 
 
 def _truncate_caption(text: str, max_len: int = 1020) -> str:

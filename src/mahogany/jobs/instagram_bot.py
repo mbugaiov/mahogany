@@ -137,25 +137,6 @@ def _download_image(url: str) -> bytes | None:
     return None
 
 
-def _generate_image(prompt: str) -> bytes | None:
-    """Generate image with DALL-E 3."""
-    try:
-        resp = client_oai.images.generate(
-            model="dall-e-3",
-            prompt=f"Photorealistic image for a community Instagram post. {prompt}. "
-                   f"Mahogany, Calgary suburb. Professional real estate photography style. "
-                   f"Bright, warm, inviting. No text overlays.",
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-        img_url = resp.data[0].url
-        return _download_image(img_url)
-    except Exception as e:
-        logger.warning(f"DALL-E generation failed: {e}")
-    return None
-
-
 def _save_temp_image(img_bytes: bytes) -> str:
     """Save image bytes to a temp file, return path. Caller must delete."""
     suffix = ".jpg"
@@ -219,11 +200,10 @@ def post_listing(cl: Client) -> bool:
         f"Make it feel exciting but honest. Include the price and address."
     )
 
-    img_bytes = _download_image(l.get("image_url")) or \
-                _generate_image(f"Beautiful {l.get('type','home')} in Mahogany Calgary, {beds} bedrooms, suburban street")
-
+    # Real listing photo only — never invent homes with DALL·E (mahogany#9)
+    img_bytes = _download_image(l.get("image_url"))
     if not img_bytes:
-        logger.warning("No image available — skipping listing post")
+        logger.warning("No real listing photo — skipping Instagram listing post")
         return False
 
     img_path = _save_temp_image(img_bytes)
@@ -264,11 +244,9 @@ def post_rental(cl: Client) -> bool:
         f"Make it feel helpful and direct. Include rent price."
     )
 
-    img_bytes = _download_image(l.get("image_url")) or \
-                _generate_image(f"Cozy rental apartment or house in Mahogany Calgary, {beds} bedrooms")
-
+    img_bytes = _download_image(l.get("image_url"))
     if not img_bytes:
-        logger.warning("No image available — skipping rental post")
+        logger.warning("No real rental photo — skipping Instagram rental post")
         return False
 
     img_path = _save_temp_image(img_bytes)
@@ -303,13 +281,11 @@ def post_insider_tip(cl: Client) -> bool:
     prompt = random.choice(tip_types)
     caption = _gpt_caption(prompt)
 
-    img_bytes = _generate_image(
-        f"Beautiful Mahogany Calgary lake community in {season}, "
-        "aerial view or street view, sunny day"
-    )
+    from mahogany.content.real_media import fetch_real_listing_image
 
+    img_bytes, _listing = fetch_real_listing_image(prefer="any")
     if not img_bytes:
-        logger.warning("No image for tip post — skipping")
+        logger.warning("No real listing photo for tip — skipping (no AI homes)")
         return False
 
     img_path = _save_temp_image(img_bytes)
@@ -350,12 +326,18 @@ def post_market_snapshot(cl: Client) -> bool:
         max_tokens=180,
     )
 
-    img_bytes = _generate_image(
-        "Mahogany Calgary residential neighbourhood aerial view, "
-        "beautiful homes, lake visible, sunny day, real estate"
-    )
+    from mahogany.content.real_media import fetch_real_listing_image
 
+    # Prefer photo from the live set we just scraped
+    img_bytes = None
+    for l in listings:
+        img_bytes = _download_image(l.get("image_url"))
+        if img_bytes:
+            break
     if not img_bytes:
+        img_bytes, _ = fetch_real_listing_image(prefer="sale")
+    if not img_bytes:
+        logger.warning("No real listing photo for market snapshot — skipping")
         return False
 
     img_path = _save_temp_image(img_bytes)
