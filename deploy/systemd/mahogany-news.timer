@@ -1,0 +1,10 @@
+[Unit]
+Description=Mahogany news job every 2 hours
+
+[Timer]
+OnCalendar=*-*-* 00/2:05:00
+Persistent=true
+Unit=mahogany-job@news.service
+
+[Install]
+WantedBy=timers.target

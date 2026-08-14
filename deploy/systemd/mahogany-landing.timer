@@ -1,0 +1,10 @@
+[Unit]
+Description=Mahogany landing stats daily
+
+[Timer]
+OnCalendar=*-*-* 09:30:00
+Persistent=true
+Unit=mahogany-job@landing.service
+
+[Install]
+WantedBy=timers.target

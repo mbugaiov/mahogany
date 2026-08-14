@@ -1,0 +1,10 @@
+[Unit]
+Description=Mahogany Instagram 3x/day
+
+[Timer]
+OnCalendar=*-*-* 10,15,20:00:00
+Persistent=true
+Unit=mahogany-job@instagram.service
+
+[Install]
+WantedBy=timers.target
