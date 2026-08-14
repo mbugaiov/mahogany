@@ -1,19 +1,30 @@
 ---
-description: Themis-style PR review format for mahogany
+description: Themis PR review format for mahogany (blocking CI)
 globs:
 alwaysApply: true
 ---
 
-# Code review format
+# Code review format (Themis)
 
-When reviewing PRs or changes in this repo, structure findings as:
+When reviewing PRs, structure findings exactly as:
+
+## Summary
+…
 
 ## Blocking issues
-- …
+None.
 
-## Non-blocking
-- …
+## Risks
+None.
 
-If nothing blocking: end with **LGTM**.
+## Nits
+None.
 
-Isolation: never couple to LRM / lab-rm. Secrets must not land in git.
+If nothing blocking and no material risks/nits: a single line is allowed:
+
+`LGTM - no blocking issues found.`
+
+Rules:
+- Isolation: never couple to LRM / lab-rm / Bitbucket lab-rm
+- Secrets must not land in git (`.env`, sessions, passwords, tokens)
+- Prefer `/opt/mahogany` paths; do not revive `/root/mahogany`

@@ -19,10 +19,12 @@
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `.github/workflows/pr.yml` | PR / push | ruff + pytest gate |
+| `.github/workflows/pr.yml` | PR → `main` | **gate** (ruff/pytest) + **review (Themis)** + **isolation (Themis)** + **auto-merge** → dispatch Deploy STG |
 | `.github/workflows/deploy-stg.yml` | push `main` + `workflow_dispatch` | rsync → `/opt/mahogany`, restart health, smoke STG |
 
-Repo secrets (already wired): `DO_DEPLOY_HOST`, `DO_DEPLOY_USER`, `DO_SSH_KEY`, `DO_KNOWN_HOSTS`  
+Same council CI shape as Pantheon. Themis is fail-closed (`CURSOR_API_KEY` required).
+
+Repo secrets: `CURSOR_API_KEY`, `DO_DEPLOY_HOST`, `DO_DEPLOY_USER`, `DO_SSH_KEY`, `DO_KNOWN_HOSTS`  
 Var: `STG_URL=http://mahogany.64.225.115.88.nip.io`
 
 ## Local commands

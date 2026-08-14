@@ -13,7 +13,7 @@ Hephaestus / Athena / Argus use engine slug **`mahogany`**. App commits only in 
 | **Hermes** | `ba-spec-first` / `impl-ba` | `BA_SPEC_READY` |
 | **Athena** | `ux-charter-first` / landing IA | `UX_CHARTER_READY` |
 | **Hephaestus** | `impl-dev` | Branch → gate → PR → STG → handoff |
-| **Themis** | Every PR | review + isolation green |
+| **Themis** | Every PR | `review (Themis)` + `isolation (Themis)` green; Risks/Nits disposed before auto-merge |
 | **Argus** | After handoff | STG smoke → ledger → `github_close_issue` |
 
 ## Labels

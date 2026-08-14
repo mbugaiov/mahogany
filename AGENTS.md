@@ -13,7 +13,7 @@ Read before coding, reviewing, or testing. Product brief: [`BRIEF.md`](./BRIEF.m
 | Tests | pytest |
 | Gate | `./scripts/gate.sh` (ruff + pytest) |
 | Spec | OpenSpec `openspec/specs/mahogany-hub/spec.md` |
-| CI | GitHub Actions — gate + Themis |
+| CI | GitHub Actions — **gate + review (Themis) + isolation (Themis) + auto-merge** |
 | Deploy | DO `/opt/mahogany` · systemd `mahogany-*` · nginx vhost |
 | STG | `http://mahogany.64.225.115.88.nip.io` |
 | Tracker | GitHub Issues · slug **`mahogany`** · tickets `mahogany#N` |
@@ -23,13 +23,14 @@ Read before coding, reviewing, or testing. Product brief: [`BRIEF.md`](./BRIEF.m
 - Labels / state machine: [`FACTORY.md`](./FACTORY.md)
 - Do **not** put `Closes #N` in PR bodies — use `Related: #N`
 - Design lock: [`DESIGN.md`](./DESIGN.md)
+- **Themis is mandatory** on every PR (same as Pantheon): blocking review + isolation; auto-merge only after Risks/Nits disposed
 
 ## Isolation
 
 - Never couple to LRM / RQ-* / Bitbucket lab-rm  
 - Ports: **3004** mahogany health (3001 LRM, 3002 Colibri, 3003 Pantheon)  
 - Paths: `/opt/mahogany`, `/var/www/mahogany`, `/etc/mahogany.env`  
-- Legacy `/root/mahogany` is read-only reference until cutover — do not extend it  
+- Legacy archive: `/root/mahogany.pre-cutover` / local `mahogany.pre-cutover` — do not extend 
 
 ## Secrets
 
