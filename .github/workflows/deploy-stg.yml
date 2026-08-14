@@ -1,0 +1,97 @@
+name: Deploy STG
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-stg-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy-stg
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gate
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -U pip setuptools wheel
+          pip install -e ".[dev]"
+          ruff check src tests
+          pytest -q
+
+      - name: Rsync + restart + smoke
+        env:
+          DO_DEPLOY_HOST: ${{ secrets.DO_DEPLOY_HOST }}
+          DO_DEPLOY_USER: ${{ secrets.DO_DEPLOY_USER }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_KNOWN_HOSTS: ${{ secrets.DO_KNOWN_HOSTS }}
+          BUILD_ID: ${{ github.sha }}
+          STG_URL: ${{ vars.STG_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DO_SSH_KEY:-}" ] || [ -z "${DO_DEPLOY_HOST:-}" ] || [ -z "${DO_DEPLOY_USER:-}" ]; then
+            echo "DO_SSH_KEY / DO_DEPLOY_HOST / DO_DEPLOY_USER not set — skipping STG deploy."
+            exit 0
+          fi
+          mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+          if printf '%s' "$DO_SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          else
+            printf '%s' "$DO_SSH_KEY" | base64 -d > "$HOME/.ssh/id_ed25519"
+          fi
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          if [ -n "${DO_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$DO_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -H "$DO_DEPLOY_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          fi
+          chmod 644 "$HOME/.ssh/known_hosts"
+          SSHC="ssh -i $HOME/.ssh/id_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes"
+          STAGE=$(mktemp -d)
+          rsync -a --exclude .venv --exclude .git --exclude data --exclude __pycache__ \
+            --exclude .pytest_cache --exclude .ruff_cache --exclude '*.egg-info' \
+            ./ "$STAGE/mahogany/"
+          printf '%s' "$BUILD_ID" > "$STAGE/mahogany/BUILD_ID"
+          rsync -az --delete -e "$SSHC" --exclude .venv \
+            "$STAGE/mahogany/" "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}:/opt/mahogany/"
+          $SSHC "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}" bash -s <<REMOTE
+          set -euo pipefail
+          cd /opt/mahogany
+          if [[ ! -d .venv ]]; then python3 -m venv .venv; fi
+          . .venv/bin/activate
+          pip install -q -U pip setuptools wheel
+          pip install -q -e .
+          printf '%s' '${BUILD_ID}' > /opt/mahogany/BUILD_ID
+          if sudo -n /usr/local/bin/mahogany-restart; then
+            true
+          else
+            echo "mahogany-restart missing — run scripts/bootstrap_droplet.sh as root once" >&2
+            exit 1
+          fi
+          REMOTE
+          STG_URL="${STG_URL:-http://mahogany.${DO_DEPLOY_HOST}.nip.io}"
+          echo "STG_URL=$STG_URL"
+          for i in 1 2 3 4 5 6; do
+            if HEALTH="$(curl -fsS --max-time 20 "$STG_URL/api/build-id")"; then
+              echo "Smoke OK: $HEALTH"
+              echo "$HEALTH" | grep -q "$BUILD_ID" || echo "WARN: buildId may not match yet"
+              exit 0
+            fi
+            echo "Smoke attempt $i failed — retry..."
+            sleep 4
+          done
+          echo "STG smoke failed" >&2
+          exit 1

@@ -7,10 +7,12 @@ Type=simple
 WorkingDirectory=/opt/mahogany
 EnvironmentFile=-/etc/mahogany.env
 Environment=MAHOGANY_DATA_DIR=/var/lib/mahogany
+Environment=MAHOGANY_HEALTH_PORT=3004
 ExecStart=/opt/mahogany/.venv/bin/mahogany-health
 Restart=always
 RestartSec=5
-User=root
+User=deploy
+Group=deploy
 
 [Install]
 WantedBy=multi-user.target
