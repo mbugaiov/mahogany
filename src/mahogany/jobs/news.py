@@ -159,19 +159,11 @@ def run_original_cycle(content_type: str = None, dry_run: bool = False, preview:
         logger.info("DRY RUN — not posting")
         return 1
 
-    # Generate a DALL-E image for original posts too
-    pillar_map = {
-        "did_you_know": "lake",
-        "insider_tip": "community",
-        "comparison": "realestate",
-        "seasonal": "lake",
-        "investment_angle": "realestate",
-    }
-    pillar = pillar_map.get(content_type or "", "community")
-
+    # Real listing photo for original posts — no AI homes (mahogany#9)
     try:
-        from mahogany.content.image_gen import generate_image
-        img_bytes = generate_image(text[:100], pillar)
+        from mahogany.content.real_media import fetch_real_listing_image
+
+        img_bytes, _ = fetch_real_listing_image(prefer="any")
     except Exception:
         img_bytes = None
 

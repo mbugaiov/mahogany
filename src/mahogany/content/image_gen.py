@@ -30,45 +30,23 @@ CACHE_DIR = data_path(".image_cache")
 CACHE_DIR.mkdir(exist_ok=True)
 
 
-# Pillar-specific image style guidance for DALL-E
+# Home / neighbourhood pillars must use real Kijiji photos (mahogany#9) — never DALL·E.
+BLOCKED_PILLARS = frozenset({"lake", "realestate", "community", "development"})
+
+# Non-home news only (skyline / abstract city — no synthetic houses)
 PILLAR_STYLES = {
-    "lake": (
-        "Beautiful lakeside photo of Mahogany Lake in Calgary, Alberta. "
-        "Blue water, sandy beach, dock, sunny day, families enjoying the water. "
-        "Photorealistic, vibrant colours, golden hour light."
-    ),
-    "realestate": (
-        "Modern family home in Calgary, Alberta, Canada. "
-        "New construction, well-maintained lawn, blue sky. "
-        "Photorealistic real estate photography style, warm welcoming look."
-    ),
-    "community": (
-        "Friendly neighbourhood community event in Calgary, Canada. "
-        "Families, children, green parks, sunny day. "
-        "Warm community atmosphere, photorealistic."
-    ),
-    "development": (
-        "New residential construction in Calgary, Alberta. "
-        "New homes being built, crane, sunny day, modern neighbourhood. "
-        "Architectural/construction photography style."
-    ),
     "safety": (
-        "Calgary, Alberta neighbourhood street, daytime. "
-        "Residential area, safe community feel. "
-        "Photorealistic, neutral tones."
+        "Calgary downtown street scene, daytime, no residential houses in frame. "
+        "Urban photography, neutral tones, NO single-family homes, NO real-estate listing look."
     ),
     "calgary": (
         "Downtown Calgary skyline with Bow River in the foreground, "
         "blue sky, Rockies visible in the background. "
-        "Photorealistic, vibrant, golden hour."
+        "Photorealistic, vibrant, golden hour. NO suburban houses in the frame."
     ),
 }
 
-DEFAULT_STYLE = (
-    "Beautiful aerial view of Mahogany neighbourhood in SE Calgary, Canada. "
-    "Lake visible, residential homes, green spaces, sunny day. "
-    "Drone photography style, photorealistic."
-)
+DEFAULT_STYLE = PILLAR_STYLES["calgary"]
 
 
 def _cache_key(prompt: str) -> str:
@@ -81,6 +59,10 @@ def generate_image(article_title: str, pillar: str = "community") -> bytes | Non
     Returns image bytes, or None on failure.
     Caches results to disk to avoid re-generating.
     """
+    if pillar in BLOCKED_PILLARS:
+        logger.info("DALL-E blocked for home pillar=%s (use real listing photos)", pillar)
+        return None
+
     style = PILLAR_STYLES.get(pillar, DEFAULT_STYLE)
 
     # Build prompt: combine style with article topic
@@ -89,6 +71,7 @@ def generate_image(article_title: str, pillar: str = "community") -> bytes | Non
         f"{style} "
         f"Related to: {title_words}. "
         f"NO text overlays, NO logos, NO people's faces visible. "
+        f"NO houses, NO real-estate listing style. "
         f"Professional photography quality."
     )
 
