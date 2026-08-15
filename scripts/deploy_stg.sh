@@ -9,13 +9,17 @@ cd "$ROOT"
 
 HOST="${DO_DEPLOY_HOST:-64.225.115.88}"
 USER="${DO_DEPLOY_USER:-deploy}"
-KEY="${DO_SSH_KEY_FILE:-$ROOT/../pantheon/.secrets/do_deploy_ed25519}"
-KH="${DO_KNOWN_HOSTS_FILE:-$ROOT/../pantheon/.secrets/known_hosts}"
+KEY="${DO_SSH_KEY_FILE:-$ROOT/.secrets/do_deploy_ed25519}"
+KH="${DO_KNOWN_HOSTS_FILE:-$ROOT/.secrets/known_hosts}"
 STG_URL="${STG_URL:-http://mahogany.${HOST}.nip.io}"
 SHA="$(git rev-parse HEAD)"
 
 if [[ ! -f "$KEY" ]]; then
-  echo "Missing deploy key: $KEY" >&2
+  echo "Missing deploy key: $KEY (set DO_SSH_KEY_FILE or place key under .secrets/)" >&2
+  exit 1
+fi
+if [[ ! -f "$KH" ]]; then
+  echo "Missing known_hosts: $KH (set DO_KNOWN_HOSTS_FILE)" >&2
   exit 1
 fi
 
@@ -39,6 +43,7 @@ rsync -a \
   --exclude '*.egg-info' \
   ./ "$STAGE/mahogany/"
 printf '%s' "$SHA" > "$STAGE/mahogany/BUILD_ID"
+BUILD_ID="$SHA" bash "$ROOT/scripts/stamp_landing_build.sh" "$STAGE/mahogany/landing/index.html"
 
 echo "== rsync → ${USER}@${HOST}:/opt/mahogany =="
 rsync -az --delete -e "$RSYNC_SSH" \
