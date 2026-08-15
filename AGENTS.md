@@ -14,8 +14,9 @@ Read before coding, reviewing, or testing. Product brief: [`BRIEF.md`](./BRIEF.m
 | Gate | `./scripts/gate.sh` (ruff + pytest) |
 | Spec | OpenSpec `openspec/specs/mahogany-hub/spec.md` |
 | CI | GitHub Actions — **gate + review (Themis) + isolation (Themis) + auto-merge** |
-| Deploy | DO `/opt/mahogany` · systemd `mahogany-*` · nginx vhost |
+| Deploy | **STG** → `/opt/mahogany` then **Prod** landing → `/var/www/mahogany` |
 | STG | `http://mahogany.64.225.115.88.nip.io` |
+| Prod | `https://mahogany-calgary.com` (landing promote after STG) |
 | Tracker | GitHub Issues · slug **`mahogany`** · tickets `mahogany#N` |
 
 ## Factory

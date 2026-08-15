@@ -65,6 +65,7 @@ jobs:
             --exclude .pytest_cache --exclude .ruff_cache --exclude '*.egg-info' \
             ./ "$STAGE/mahogany/"
           printf '%s' "$BUILD_ID" > "$STAGE/mahogany/BUILD_ID"
+          BUILD_ID="$BUILD_ID" bash scripts/stamp_landing_build.sh "$STAGE/mahogany/landing/index.html"
           rsync -az --delete -e "$SSHC" --exclude .venv \
             "$STAGE/mahogany/" "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}:/opt/mahogany/"
           $SSHC "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}" bash -s <<REMOTE

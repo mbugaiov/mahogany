@@ -1,0 +1,120 @@
+name: Deploy Prod
+
+# After STG succeeds on main: promote landing to https://mahogany-calgary.com
+# (/var/www/mahogany). App/bots already serve from /opt/mahogany via Deploy STG.
+on:
+  workflow_run:
+    workflows: ["Deploy STG"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Git SHA to promote (default: current main tip)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-prod-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    name: deploy-prod
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event != 'pull_request')
+    steps:
+      - name: Resolve SHA
+        id: rev
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SHA="${{ inputs.sha }}"
+            if [[ -z "$SHA" ]]; then
+              SHA="${{ github.sha }}"
+            fi
+          else
+            SHA="${{ github.event.workflow_run.head_sha }}"
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Promoting SHA=$SHA"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.rev.outputs.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gate
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -U pip setuptools wheel
+          pip install -e ".[dev]"
+          ruff check src tests
+          pytest -q
+
+      - name: Stamp + rsync landing + smoke prod
+        env:
+          DO_DEPLOY_HOST: ${{ secrets.DO_DEPLOY_HOST }}
+          DO_DEPLOY_USER: ${{ secrets.DO_DEPLOY_USER }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_KNOWN_HOSTS: ${{ secrets.DO_KNOWN_HOSTS }}
+          BUILD_ID: ${{ steps.rev.outputs.sha }}
+          PROD_URL: ${{ vars.PROD_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DO_SSH_KEY:-}" ] || [ -z "${DO_DEPLOY_HOST:-}" ] || [ -z "${DO_DEPLOY_USER:-}" ]; then
+            echo "DO_SSH_KEY / DO_DEPLOY_HOST / DO_DEPLOY_USER not set — skipping prod deploy."
+            exit 0
+          fi
+          mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+          if printf '%s' "$DO_SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          else
+            printf '%s' "$DO_SSH_KEY" | base64 -d > "$HOME/.ssh/id_ed25519"
+          fi
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          if [ -n "${DO_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$DO_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -H "$DO_DEPLOY_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          fi
+          chmod 644 "$HOME/.ssh/known_hosts"
+          SSHC="ssh -i $HOME/.ssh/id_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes"
+          PROD_URL="${PROD_URL:-https://mahogany-calgary.com}"
+          REMOTE_LANDING="/var/www/mahogany"
+          STAGE=$(mktemp -d)
+          cp landing/index.html "$STAGE/index.html"
+          BUILD_ID="$BUILD_ID" bash scripts/stamp_landing_build.sh "$STAGE/index.html"
+          printf '%s' "$BUILD_ID" > "$STAGE/BUILD_ID"
+          rsync -az -e "$SSHC" \
+            "$STAGE/index.html" "$STAGE/BUILD_ID" \
+            "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}:${REMOTE_LANDING}/"
+          echo "PROD_URL=$PROD_URL"
+          for i in 1 2 3 4 5 6; do
+            BODY=$(curl -fsSL --max-time 20 "$PROD_URL/" || true)
+            if [[ -n "$BODY" ]] && echo "$BODY" | grep -q "Mahogany Life" \
+              && echo "$BODY" | grep -q "mahogany-build\" content=\"$BUILD_ID\""; then
+              echo "Prod smoke OK: build $BUILD_ID"
+              exit 0
+            fi
+            echo "Prod smoke attempt $i failed — retry..."
+            sleep 4
+          done
+          REMOTE=$($SSHC "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}" "cat ${REMOTE_LANDING}/BUILD_ID 2>/dev/null || true")
+          if [[ "$REMOTE" == "$BUILD_ID" ]]; then
+            echo "Prod BUILD_ID file MATCH ($BUILD_ID); HTML may be CDN-cached"
+            exit 0
+          fi
+          echo "Prod smoke failed" >&2
+          exit 1

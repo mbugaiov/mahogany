@@ -11,21 +11,27 @@
 | Env | `/etc/mahogany.env` (copied from legacy — **not rotated yet**) |
 | Health | port **3004** · `GET /api/build-id` |
 | STG URL | http://mahogany.64.225.115.88.nip.io |
-| Prod landing | https://mahogany-calgary.com (legacy nginx vhost still serves `/var/www/mahogany`) |
-| systemd (new) | `mahogany-health` |
-| systemd (legacy) | still `/root/mahogany` — **left running** until cutover |
+| Prod landing | https://mahogany-calgary.com |
+| systemd | `mahogany-health`, `mahogany-groupbot`, timers |
 
-## Pipelines (GitHub Actions)
+**Note:** Bots/jobs and health run from `/opt/mahogany` (Deploy STG). Prod promote only ships the **public landing** to `/var/www/mahogany`.
+
+## Pipeline (agent-owned)
+
+```
+PR → Themis + gate → auto-merge → Deploy STG → Deploy Prod
+```
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `.github/workflows/pr.yml` | PR → `main` | **gate** (ruff/pytest) + **review (Themis)** + **isolation (Themis)** + **auto-merge** → dispatch Deploy STG |
-| `.github/workflows/deploy-stg.yml` | push `main` + `workflow_dispatch` | rsync → `/opt/mahogany`, restart health, smoke STG |
+| `.github/workflows/pr.yml` | PR → `main` | gate + Themis review/isolation + auto-merge → dispatch Deploy STG |
+| `.github/workflows/deploy-stg.yml` | push `main` + `workflow_dispatch` | rsync → `/opt/mahogany`, stamp landing build meta, restart health, smoke STG |
+| `.github/workflows/deploy-prod.yml` | **after Deploy STG succeeds** on `main` + `workflow_dispatch` | promote stamped landing → `/var/www/mahogany`, smoke prod |
 
-Same council CI shape as Pantheon. Themis is fail-closed (`CURSOR_API_KEY` required).
+Landing smoke looks for `<meta name="mahogany-build" content="<sha>" />`. If Cloudflare caches HTML, CI falls back to `/var/www/mahogany/BUILD_ID` over SSH.
 
 Repo secrets: `CURSOR_API_KEY`, `DO_DEPLOY_HOST`, `DO_DEPLOY_USER`, `DO_SSH_KEY`, `DO_KNOWN_HOSTS`  
-Var: `STG_URL=http://mahogany.64.225.115.88.nip.io`
+Vars: `STG_URL=http://mahogany.64.225.115.88.nip.io`, `PROD_URL=https://mahogany-calgary.com` (optional; default baked in)
 
 ## Local commands
 
@@ -33,6 +39,15 @@ Var: `STG_URL=http://mahogany.64.225.115.88.nip.io`
 ./scripts/gate.sh
 bash scripts/deploy_stg.sh
 bash scripts/check_stg_build.sh
+bash scripts/deploy_prod.sh      # promote landing after STG
+bash scripts/check_prod_build.sh
+```
+
+Manual Actions:
+
+```bash
+gh workflow run deploy-stg.yml --ref main
+gh workflow run deploy-prod.yml --ref main   # or after STG via workflow_run
 ```
 
 One-time root bootstrap (already applied on droplet): `scripts/bootstrap_droplet.sh`
@@ -43,14 +58,6 @@ One-time root bootstrap (already applied on droplet): `scripts/bootstrap_droplet
 
 ### Remaining optional
 
-- Rotate secrets (mahogany#3)
 - Port `economics` job or keep timer disabled
 - Delete `/root/mahogany.pre-cutover` after a soak period
 - Archive local `/Users/max/Downloads/project/mahogany`
-
-## Cutover (historical)
-
-1. Point job timers at `/opt/mahogany` CLI  
-2. Stop legacy `/root/mahogany` units  
-3. Unload Mac `com.mahogany.*`  
-4. Rotate secrets when you choose (ticket #3)

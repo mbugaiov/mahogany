@@ -39,6 +39,7 @@ rsync -a \
   --exclude '*.egg-info' \
   ./ "$STAGE/mahogany/"
 printf '%s' "$SHA" > "$STAGE/mahogany/BUILD_ID"
+BUILD_ID="$SHA" bash "$ROOT/scripts/stamp_landing_build.sh" "$STAGE/mahogany/landing/index.html"
 
 echo "== rsync → ${USER}@${HOST}:/opt/mahogany =="
 rsync -az --delete -e "$RSYNC_SSH" \
