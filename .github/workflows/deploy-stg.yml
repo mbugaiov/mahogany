@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   deploy:
@@ -102,6 +101,9 @@ jobs:
     name: dispatch-deploy-prod
     needs: deploy
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Dispatch Deploy Prod for this SHA
         env:
