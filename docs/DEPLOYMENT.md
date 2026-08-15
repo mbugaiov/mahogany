@@ -25,10 +25,10 @@ PR → Themis + gate → auto-merge → Deploy STG → Deploy Prod
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `.github/workflows/pr.yml` | PR → `main` | gate + Themis review/isolation + auto-merge → dispatch Deploy STG |
-| `.github/workflows/deploy-stg.yml` | push `main` + `workflow_dispatch` | rsync → `/opt/mahogany`, stamp landing build meta, restart health, smoke STG |
-| `.github/workflows/deploy-prod.yml` | **after Deploy STG succeeds** on `main` + `workflow_dispatch` | promote stamped landing → `/var/www/mahogany`, smoke prod |
+| `.github/workflows/deploy-stg.yml` | push `main` + `workflow_dispatch` | **STG** (`/opt/mahogany` + smoke) then **Prod** landing (`/var/www/mahogany` + smoke) in the same workflow |
+| `.github/workflows/deploy-prod.yml` | `workflow_dispatch` (+ optional `workflow_run`) | Manual / backup landing-only promote |
 
-Landing smoke looks for `<meta name="mahogany-build" content="<sha>" />`. If Cloudflare caches HTML, CI falls back to `/var/www/mahogany/BUILD_ID` over SSH.
+Chain: `PR → Themis → auto-merge → Deploy STG job → Deploy Prod job` (same Actions run).
 
 Repo secrets: `CURSOR_API_KEY`, `DO_DEPLOY_HOST`, `DO_DEPLOY_USER`, `DO_SSH_KEY`, `DO_KNOWN_HOSTS`  
 Vars: `STG_URL=http://mahogany.64.225.115.88.nip.io`, `PROD_URL=https://mahogany-calgary.com`  
