@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   deploy:
@@ -96,3 +97,28 @@ jobs:
           done
           echo "STG smoke failed" >&2
           exit 1
+
+  promote-prod:
+    name: dispatch-deploy-prod
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Deploy Prod for this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          echo "Dispatching Deploy Prod sha=$SHA"
+          ok=0
+          for attempt in 1 2 3; do
+            if gh workflow run deploy-prod.yml --ref main -f sha="$SHA"; then
+              ok=1
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$ok" -ne 1 ]]; then
+            echo "ERROR: Deploy Prod dispatch failed" >&2
+            exit 1
+          fi
