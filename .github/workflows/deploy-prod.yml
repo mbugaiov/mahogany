@@ -1,11 +1,8 @@
 name: Deploy Prod
 
-# After STG succeeds on main: promote landing to https://mahogany-calgary.com
-# (/var/www/mahogany). App/bots already serve from /opt/mahogany via Deploy STG.
+# Manual / backup landing-only promote. Primary path is the deploy-prod job
+# inside Deploy STG (after STG smoke).
 on:
-  workflow_run:
-    workflows: ["Deploy STG"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       sha:
@@ -25,11 +22,7 @@ jobs:
   deploy:
     name: deploy-prod
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event != 'pull_request')
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Resolve SHA
         id: rev
