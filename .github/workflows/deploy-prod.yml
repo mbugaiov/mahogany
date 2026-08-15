@@ -74,8 +74,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${DO_SSH_KEY:-}" ] || [ -z "${DO_DEPLOY_HOST:-}" ] || [ -z "${DO_DEPLOY_USER:-}" ]; then
-            echo "DO_SSH_KEY / DO_DEPLOY_HOST / DO_DEPLOY_USER not set — skipping prod deploy."
-            exit 0
+            echo "DO_SSH_KEY / DO_DEPLOY_HOST / DO_DEPLOY_USER not set — failing prod deploy." >&2
+            exit 1
           fi
           mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
           if printf '%s' "$DO_SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
@@ -112,9 +112,9 @@ jobs:
             sleep 4
           done
           REMOTE=$($SSHC "${DO_DEPLOY_USER}@${DO_DEPLOY_HOST}" "cat ${REMOTE_LANDING}/BUILD_ID 2>/dev/null || true")
-          if [[ "$REMOTE" == "$BUILD_ID" ]]; then
-            echo "Prod BUILD_ID file MATCH ($BUILD_ID); HTML may be CDN-cached"
+          if [[ "$REMOTE" == "$BUILD_ID" && "${ALLOW_PROD_CDN_STALE:-0}" == "1" ]]; then
+            echo "WARN: Prod BUILD_ID file MATCH ($BUILD_ID); HTML meta CDN-stale allowed"
             exit 0
           fi
-          echo "Prod smoke failed" >&2
+          echo "Prod smoke failed (HTML meta missing build $BUILD_ID; remote file='$REMOTE')" >&2
           exit 1

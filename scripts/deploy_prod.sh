@@ -11,14 +11,19 @@ cd "$ROOT"
 
 HOST="${DO_DEPLOY_HOST:-64.225.115.88}"
 USER="${DO_DEPLOY_USER:-deploy}"
-KEY="${DO_SSH_KEY_FILE:-$ROOT/../pantheon/.secrets/do_deploy_ed25519}"
-KH="${DO_KNOWN_HOSTS_FILE:-$ROOT/../pantheon/.secrets/known_hosts}"
+KEY="${DO_SSH_KEY_FILE:-$ROOT/.secrets/do_deploy_ed25519}"
+KH="${DO_KNOWN_HOSTS_FILE:-$ROOT/.secrets/known_hosts}"
 PROD_URL="${PROD_URL:-https://mahogany-calgary.com}"
 REMOTE_LANDING="${PROD_LANDING_PATH:-/var/www/mahogany}"
 BUILD_ID="${BUILD_ID:-$(git rev-parse HEAD)}"
+ALLOW_CDN_STALE="${ALLOW_PROD_CDN_STALE:-0}"
 
 if [[ ! -f "$KEY" ]]; then
-  echo "Missing deploy key: $KEY" >&2
+  echo "Missing deploy key: $KEY (set DO_SSH_KEY_FILE or place key under .secrets/)" >&2
+  exit 1
+fi
+if [[ ! -f "$KH" ]]; then
+  echo "Missing known_hosts: $KH (set DO_KNOWN_HOSTS_FILE)" >&2
   exit 1
 fi
 
@@ -53,11 +58,15 @@ for i in 1 2 3 4 5 6; do
   sleep 3
 done
 
-# Fallback: confirm remote BUILD_ID file via SSH
+# Fallback: confirm remote BUILD_ID file via SSH (CDN may lag)
 REMOTE=$("${SSHC[@]}" "${USER}@${HOST}" "cat ${REMOTE_LANDING}/BUILD_ID 2>/dev/null || true")
 if [[ "$REMOTE" == "$BUILD_ID" ]]; then
-  echo "Prod BUILD_ID file MATCH ($BUILD_ID); HTML meta may be Cloudflare-cached"
-  exit 0
+  if [[ "$ALLOW_CDN_STALE" == "1" ]]; then
+    echo "WARN: Prod BUILD_ID file MATCH ($BUILD_ID); HTML meta CDN-stale allowed"
+    exit 0
+  fi
+  echo "Prod BUILD_ID on disk MATCH but HTML meta missing $BUILD_ID (CDN?). Re-run or set ALLOW_PROD_CDN_STALE=1" >&2
+  exit 1
 fi
 
 echo "Prod smoke failed (expected build $BUILD_ID, remote file='$REMOTE')" >&2

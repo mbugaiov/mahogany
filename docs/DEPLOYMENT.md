@@ -31,8 +31,10 @@ PR → Themis + gate → auto-merge → Deploy STG → Deploy Prod
 Landing smoke looks for `<meta name="mahogany-build" content="<sha>" />`. If Cloudflare caches HTML, CI falls back to `/var/www/mahogany/BUILD_ID` over SSH.
 
 Repo secrets: `CURSOR_API_KEY`, `DO_DEPLOY_HOST`, `DO_DEPLOY_USER`, `DO_SSH_KEY`, `DO_KNOWN_HOSTS`  
-Vars: `STG_URL=http://mahogany.64.225.115.88.nip.io`, `PROD_URL=https://mahogany-calgary.com` (optional; default baked in)
+Vars: `STG_URL=http://mahogany.64.225.115.88.nip.io`, `PROD_URL=https://mahogany-calgary.com`  
+Local SSH: place key + known_hosts under **`mahogany/.secrets/`** (gitignored) or set `DO_SSH_KEY_FILE` / `DO_KNOWN_HOSTS_FILE` — do not hardcode sibling product paths.
 
+Prod HTML smoke is fail-closed. If Cloudflare lags, set `ALLOW_PROD_CDN_STALE=1` only as a temporary override.
 ## Local commands
 
 ```bash
