@@ -6,6 +6,10 @@ Hephaestus / Athena / Argus use engine slug **`mahogany`**. App commits only in 
 
 **Tech stack:** [`AGENTS.md`](./AGENTS.md) § Stack · `docs/PRD.md`.
 
+## Portfolio wake (Kairos)
+
+Default campus path: **Kairos** polls this repo’s Issues → wakes Hephaestus(`mahogany`) **oneshot** → drain → idle → sleep. Do not keep a permanent `dev-loop.sh mahogany` under Kairos. Iris only creates tickets; it does not arm the forge.
+
 ## Council involvement
 
 | Seat | When | Required signal |
