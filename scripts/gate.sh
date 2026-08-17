@@ -26,6 +26,7 @@ echo "== pytest =="
 pytest -q
 
 echo "gate OK"
+# Themis review job floats themis-agent main (shared review-rules); isolation/ensure stay pinned.
 
 echo "== themis review wiring =="
 grep -q 'build_review_prompt.sh' .github/workflows/pr.yml
