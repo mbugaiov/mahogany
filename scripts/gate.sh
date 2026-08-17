@@ -26,3 +26,8 @@ echo "== pytest =="
 pytest -q
 
 echo "gate OK"
+
+echo "== themis review wiring =="
+grep -q 'build_review_prompt.sh' .github/workflows/pr.yml
+grep -q 'repository: mbugaiov/themis-agent' .github/workflows/pr.yml
+echo "themis review wiring ok"
