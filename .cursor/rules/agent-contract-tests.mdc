@@ -1,0 +1,42 @@
+---
+description: Every change to agent kicks/ticks/handoffs/labels/state latches MUST ship matching tests — quality only grows
+alwaysApply: true
+---
+
+# Agent contract tests (always with the change)
+
+When you change **how agents interact** — kicks, ticks, wakes, handoffs, labels, pending latches, sentinels, ensure/oneshot, scope/drain, or cross-repo pull contracts — **deliver tests in the same change**. No “tests later”.
+
+## What counts as a contract
+
+- Label → kick decisions (`should_kick_*`, Iris label shape)
+- Tick / wake sentinels (`BACKLOG_WAKE_EXECUTE`, `QA_WAKE_EXECUTE`, oneshot ensure)
+- Handoff state machines (impl-dev → validate-testing → done; consume pending)
+- Latch files (pending-execute, argus-kick, qa-pending) consume/ack rules
+- Cross-seat handoffs (Hermes/Athena/Argus/Metis/Kairos/Iris → next seat)
+- Product scripts that consume engine exports (e.g. `pull_metis_scorecard`)
+
+## Where tests live
+
+| Layer | Prefer |
+|-------|--------|
+| Engine (`*-agent`) | Pure unit tests on decision libs + `tests/run_tests.sh` / vitest for scripts |
+| Product (pantheon, mahogany, …) | Contract tests that pin pull/handoff docs + fixtures — **not** live network as the only gate |
+| Cross-agent | Fixture JSON + pure functions; optional scripted smoke — avoid flaky live Telegram/Jira in CI |
+
+## Required bar for a PR
+
+1. **Regression test** for the new/changed behavior (happy path).
+2. **Negative / guard** where relevant (no invent scores; no ambient hook inject; no kick without label).
+3. CI / `tests/run_tests.sh` / `npm test` **green** before merge.
+4. If you cannot automate end-to-end, still ship a **unit/contract** test of the pure decision — do not ship unlabeled behavior.
+
+## Forbidden
+
+- Shipping kick/handoff/latch changes with “manual verify only”
+- Weakening or deleting contract tests to make CI pass without fixing the product
+- Inventing Metis/Plutus numbers in product code when a pull/export contract exists
+
+## Complexity note (do not overbuild)
+
+Prefer **fast pure tests** of state transitions over full multi-agent E2E in CI. Grow a shared matrix of contracts over time; each PR adds rows, never removes coverage without replacement.

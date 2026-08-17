@@ -57,8 +57,15 @@ OPENAI_KEY   = os.getenv("OPENAI_API_KEY", "")
 SESSION_FILE = data_path("ig_session.json")
 IG_SEEN_FILE = data_path("ig_seen.json")
 
-client_oai = OpenAI(api_key=OPENAI_KEY)
+_client_oai: OpenAI | None = None
 HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 AppleWebKit/537.36"}
+
+
+def _oai() -> OpenAI:
+    global _client_oai
+    if _client_oai is None:
+        _client_oai = OpenAI(api_key=OPENAI_KEY or None)
+    return _client_oai
 
 
 # ── Instagram client ──────────────────────────────────────────────────────────
@@ -153,13 +160,18 @@ def _strip_html(text: str) -> str:
 
 MAYA_IG_SYSTEM = """You are Maya — a warm local guide for Mahogany, Calgary.
 You write Instagram captions for the @mahogany.calgary community account.
-Style: conversational, friendly, informative. 2-4 sentences max.
+
+Primary voice: neighbourhood life — lake, pathways, Seton, family weekends,
+seasonal living, quiet community tips. Real-estate listings are secondary,
+never pushy sales copy.
+
+Style: conversational, friendly, specific to SE Calgary / Mahogany. 2-4 sentences.
 End with 5-8 relevant hashtags on a new line.
-No emojis in excess — 1-2 max. Plain readable text."""
+1-2 emojis max. Plain readable text."""
 
 
 def _gpt_caption(prompt: str, max_tokens: int = 200) -> str:
-    resp = client_oai.chat.completions.create(
+    resp = _oai().chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": MAYA_IG_SYSTEM},
@@ -263,7 +275,7 @@ def post_rental(cl: Client) -> bool:
 
 
 def post_insider_tip(cl: Client) -> bool:
-    """Post an insider tip / local knowledge post."""
+    """Post community / lifestyle tip (primary Instagram theme)."""
     season_map = {
         1:"winter",2:"winter",3:"early spring",4:"spring",5:"spring",
         6:"summer",7:"summer",8:"summer",9:"fall",10:"fall",11:"fall",12:"winter"
@@ -271,12 +283,16 @@ def post_insider_tip(cl: Client) -> bool:
     season = season_map.get(datetime.now().month, "spring")
 
     tip_types = [
-        f"Write a short insider tip about living in Mahogany, Calgary in {season}. "
-        "Something specific and useful that a local would know. Under 3 sentences.",
-        f"Write a 'Did you know?' fact about Mahogany, Calgary. "
-        "Something surprising or useful. Under 3 sentences.",
-        f"Write a local recommendation for Mahogany residents in {season}. "
-        "Could be about the lake, pathways, nearby Seton, or community events.",
+        f"Write a short Mahogany lake / boardwalk tip for {season} in SE Calgary. "
+        "Specific and useful for residents — not a real-estate ad. Under 3 sentences.",
+        f"Write a pathways / walkability tip for Mahogany + nearby Seton in {season}. "
+        "Something a local would actually do this week. Under 3 sentences.",
+        f"Write a family weekend idea in or near Mahogany for {season} "
+        "(lake, parks, Seton amenities). Warm community voice. Under 3 sentences.",
+        f"Write a 'new to Mahogany' settling-in tip for {season} — "
+        "neighbours, quiet streets, daily life — not homebuying advice. Under 3 sentences.",
+        f"Write a seasonal living tip for Mahogany Calgary in {season} "
+        "(weather, lake freeze/thaw, evening walks). Under 3 sentences.",
     ]
     prompt = random.choice(tip_types)
     caption = _gpt_caption(prompt)
@@ -354,7 +370,17 @@ def post_market_snapshot(cl: Client) -> bool:
 
 # ── Auto rotation ─────────────────────────────────────────────────────────────
 
-ROTATION = ["listing", "tip", "rental", "tip", "listing", "market", "tip", "rental"]
+# Community/lifestyle first; listings & rentals secondary (was listing-heavy).
+ROTATION = [
+    "tip",
+    "tip",
+    "listing",
+    "tip",
+    "rental",
+    "tip",
+    "market",
+    "tip",
+]
 ROTATION_FILE = data_path("ig_rotation.json")
 
 
@@ -373,11 +399,11 @@ def _next_post_type() -> str:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def run(post_type: str = "auto"):
+def run(post_type: str = "auto", *, force: bool = False) -> bool:
     from mahogany.state.dedup import can_run_bot, mark_bot_ran
 
-    if not can_run_bot("instagram_bot", min_interval_hours=3):
-        return
+    if not force and not can_run_bot("instagram_bot", min_interval_hours=3):
+        return False
 
     cl = get_ig_client()
 
@@ -391,7 +417,7 @@ def run(post_type: str = "auto"):
         ok = post_listing(cl)
     elif post_type == "rental":
         ok = post_rental(cl)
-    elif post_type == "tip":
+    elif post_type in {"tip", "community"}:
         ok = post_insider_tip(cl)
     elif post_type == "market":
         ok = post_market_snapshot(cl)
@@ -401,15 +427,27 @@ def run(post_type: str = "auto"):
     if ok:
         mark_bot_ran("instagram_bot")
     logger.info("Done.")
+    return ok
+
+
+def main(argv: list[str] | None = None) -> None:
+    """CLI entry for `mahogany instagram` (required by mahogany.cli)."""
+    parser = argparse.ArgumentParser(prog="instagram")
+    parser.add_argument(
+        "--post",
+        choices=["listing", "rental", "tip", "community", "market", "auto"],
+        default="auto",
+        help="What to post (default: auto-rotate; tip/community = lifestyle)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass min-interval guard (manual / smoke posts)",
+    )
+    args = parser.parse_args(argv)
+    ok = run(post_type=args.post, force=args.force)
+    raise SystemExit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--post",
-        choices=["listing", "rental", "tip", "market", "auto"],
-        default="auto",
-        help="What to post (default: auto-rotate)",
-    )
-    args = parser.parse_args()
-    run(post_type=args.post)
+    main()
