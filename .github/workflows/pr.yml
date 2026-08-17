@@ -64,8 +64,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: mbugaiov/themis-agent
-          # Keep in sync with THEMIS_AGENT_REF
-          ref: 236d9de61677af77c8540ec792e2d834f20c6f55
           path: .themis-agent
       - name: Themis review
         env:
