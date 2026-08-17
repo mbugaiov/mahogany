@@ -29,6 +29,11 @@ Automated community hub for **Mahogany, Calgary** — landing + Telegram + Insta
 | Health | FastAPI sidecar port **3004** `/api/build-id` |
 | Tests / gate | pytest · ruff · `./scripts/gate.sh` |
 | CI | GitHub Actions (gate + Themis) |
+
+**Themis:** CI `review (Themis)` floats `themis-agent` **main** (shared `review-rules/`).
+Local `.themis-agent/` may be stale (pinned via `ensure_themis_agent.sh` for isolation).
+`gate.sh` prints the builder tip (path + short SHA) when present; offline local runs may
+skip the builder selftest, but **CI fail-closed** — missing checkout/builder exits non-zero.
 | Tracker | GitHub Issues only |
 
 Agent notes: [`AGENTS.md`](./AGENTS.md).

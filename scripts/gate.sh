@@ -34,7 +34,19 @@ grep -q 'repository: mbugaiov/themis-agent' .github/workflows/pr.yml
 echo "themis review wiring ok"
 
 echo "== themis build_review_prompt selftest =="
+# Offline local runs may skip the builder when git clone is unavailable.
+# CI (GITHUB_ACTIONS=true) must never skip — missing checkout/builder exits 1.
+# Stale .themis-agent/ is OK locally (pinned via ensure); CI review job floats themis main.
+print_themis_tip() {
+  local root="$1"
+  local sha="unknown"
+  if [[ -d "$root/.git" ]]; then
+    sha="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  fi
+  echo "themis builder tip: $root @ ${sha}"
+}
 THEMIS_ROOT=""
+THEMIS_TMP=""
 if [[ -x .themis-agent/scripts/build_review_prompt.sh ]]; then
   THEMIS_ROOT=.themis-agent
 else
@@ -44,9 +56,14 @@ else
   fi
 fi
 if [[ -n "$THEMIS_ROOT" ]]; then
+  print_themis_tip "$THEMIS_ROOT"
   OUT=$(bash "$THEMIS_ROOT/scripts/build_review_prompt.sh" --pr 1 --base origin/main --label mahogany-selftest --local-rule .cursor/rules/code-review.mdc --themis-root "$THEMIS_ROOT")
   echo "$OUT" | grep -q review-rules/10-tests-must-have
 else
-  echo "themis builder skipped (offline) — review wiring grep already passed"
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "themis builder missing in CI — fail-closed" >&2
+    exit 1
+  fi
+  echo "themis builder skipped (offline local) — review wiring grep already passed"
 fi
 rm -rf "${THEMIS_TMP:-}"
