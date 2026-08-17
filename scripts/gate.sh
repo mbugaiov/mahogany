@@ -26,3 +26,15 @@ echo "== pytest =="
 pytest -q
 
 echo "gate OK"
+
+echo "== themis review wiring =="
+grep -q 'build_review_prompt.sh' .github/workflows/pr.yml
+grep -q 'repository: mbugaiov/themis-agent' .github/workflows/pr.yml
+echo "themis review wiring ok"
+
+echo "== themis build_review_prompt selftest =="
+THEMIS_TMP=$(mktemp -d)
+git clone --depth 1 https://github.com/mbugaiov/themis-agent.git "$THEMIS_TMP/themis" >/dev/null 2>&1
+OUT=$(bash "$THEMIS_TMP/themis/scripts/build_review_prompt.sh" --pr 1 --base origin/main --label mahogany-selftest --local-rule .cursor/rules/code-review.mdc --themis-root "$THEMIS_TMP/themis")
+echo "$OUT" | grep -q review-rules/10-tests-must-have
+rm -rf "$THEMIS_TMP"

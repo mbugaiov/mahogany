@@ -10,7 +10,7 @@ REPO_URL="${THEMIS_AGENT_GIT_URL:-https://github.com/mbugaiov/themis-agent.git}"
 if [[ -z "${THEMIS_AGENT_REF:-}" && -f "$ROOT/scripts/THEMIS_AGENT_REF" ]]; then
   THEMIS_AGENT_REF="$(tr -d '[:space:]' < "$ROOT/scripts/THEMIS_AGENT_REF")"
 fi
-REF="${THEMIS_AGENT_REF:-3250607f3700d0c2cb73f226435e4b69afd2e118}"
+REF="${THEMIS_AGENT_REF:-236d9de61677af77c8540ec792e2d834f20c6f55}"
 
 ready() {
   [[ -f "$DEST/scripts/check_review_followups_disposed.sh" \

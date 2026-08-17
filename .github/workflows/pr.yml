@@ -61,6 +61,10 @@ jobs:
         run: |
           echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+        with:
+          repository: mbugaiov/themis-agent
+          path: .themis-agent
       - name: Themis review
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
@@ -87,13 +91,14 @@ jobs:
           if [ ! -s themis.diff ] || [ -z "$(tr -d '[:space:]' < themis.diff)" ]; then
             echo "LGTM - no blocking issues found." > review.md
           else
-            printf '%s\n' \
-              'You are Themis reviewing a Mahogany PR. Follow .cursor/rules/code-review.mdc exactly.' \
-              'Review ONLY this branch'\''s changes vs origin/main.' \
-              'The unified diff is in the workspace file themis.diff — read that file (do not invent files outside the diff).' \
-              'Produce the required markdown sections (## Summary, ## Blocking issues, ## Risks, ## Nits)' \
-              'or the single-line LGTM shortcut when clean.' \
-              > themis-prompt.txt
+            PROMPT="$(bash .themis-agent/scripts/build_review_prompt.sh \
+              --pr "${{ github.event.pull_request.number }}" \
+              --base origin/main \
+              --label mahogany \
+              --local-rule .cursor/rules/code-review.mdc \
+              --themis-root .themis-agent \
+              --extra "The unified diff is in workspace file themis.diff — read that file. Product may also use ## Nits.")"
+            printf '%s\n' "$PROMPT" > themis-prompt.txt
             set +e
             agent -p --force --api-key "$CURSOR_API_KEY" --output-format text "$(cat themis-prompt.txt)" \
               > review.md 2> review.err
@@ -132,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: mbugaiov/themis-agent
-          ref: 3250607f3700d0c2cb73f226435e4b69afd2e118
+          ref: 236d9de61677af77c8540ec792e2d834f20c6f55
           path: .themis-agent
       - name: Cache Cursor CLI
         id: cache-cursor
@@ -194,7 +199,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mbugaiov/themis-agent
-          ref: 3250607f3700d0c2cb73f226435e4b69afd2e118
+          ref: 236d9de61677af77c8540ec792e2d834f20c6f55
           path: .themis-agent
 
       - name: Require Themis Risks/Nits disposed
