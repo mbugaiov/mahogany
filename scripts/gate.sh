@@ -33,8 +33,19 @@ grep -q 'repository: mbugaiov/themis-agent' .github/workflows/pr.yml
 echo "themis review wiring ok"
 
 echo "== themis build_review_prompt selftest =="
-THEMIS_TMP=$(mktemp -d)
-git clone --depth 1 https://github.com/mbugaiov/themis-agent.git "$THEMIS_TMP/themis" >/dev/null 2>&1
-OUT=$(bash "$THEMIS_TMP/themis/scripts/build_review_prompt.sh" --pr 1 --base origin/main --label mahogany-selftest --local-rule .cursor/rules/code-review.mdc --themis-root "$THEMIS_TMP/themis")
-echo "$OUT" | grep -q review-rules/10-tests-must-have
-rm -rf "$THEMIS_TMP"
+THEMIS_ROOT=""
+if [[ -x .themis-agent/scripts/build_review_prompt.sh ]]; then
+  THEMIS_ROOT=.themis-agent
+else
+  THEMIS_TMP=$(mktemp -d)
+  if git clone --depth 1 https://github.com/mbugaiov/themis-agent.git "$THEMIS_TMP/themis" >/dev/null 2>&1; then
+    THEMIS_ROOT="$THEMIS_TMP/themis"
+  fi
+fi
+if [[ -n "$THEMIS_ROOT" ]]; then
+  OUT=$(bash "$THEMIS_ROOT/scripts/build_review_prompt.sh" --pr 1 --base origin/main --label mahogany-selftest --local-rule .cursor/rules/code-review.mdc --themis-root "$THEMIS_ROOT")
+  echo "$OUT" | grep -q review-rules/10-tests-must-have
+else
+  echo "themis builder skipped (offline) — review wiring grep already passed"
+fi
+rm -rf "${THEMIS_TMP:-}"
