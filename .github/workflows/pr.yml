@@ -98,8 +98,7 @@ jobs:
               --local-rule .cursor/rules/code-review.mdc \
               --themis-root .themis-agent \
               --extra "The unified diff is in workspace file themis.diff — read that file. Product may also use ## Nits.")"
-            printf '%s
-' "$PROMPT" > themis-prompt.txt
+            printf '%s\n' "$PROMPT" > themis-prompt.txt
             set +e
             agent -p --force --api-key "$CURSOR_API_KEY" --output-format text "$(cat themis-prompt.txt)" \
               > review.md 2> review.err
